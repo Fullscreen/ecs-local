@@ -15,7 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ecr"
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/sts"
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 	"github.com/sirupsen/logrus"
 	flag "github.com/spf13/pflag"
 )
@@ -29,7 +29,7 @@ const (
 )
 
 var (
-	Version = "No version specified"
+	Version = "0.1.2"
 )
 
 var (
@@ -37,6 +37,7 @@ var (
 
 	// options
 	helpFlag    = f.BoolP("help", "h", false, "help")
+	logFlag     = f.BoolP("logs", "l", false, "logs")
 	envFlags    = f.StringSliceP("env", "e", []string{}, "key=value")
 	profileFlag = f.StringP("profile", "p", "", "AWS profile")
 	regionFlag  = f.StringP("region", "r", "", "AWS region")
@@ -44,10 +45,11 @@ var (
 )
 
 const helpString = `Usage:
-  ecs-local [-hv] [--profile=aws_profile] [--region=aws_region] [-e key=value] [task_def] [command...]
+  ecs-local [-hv] [-l] [--profile=aws_profile] [--region=aws_region] [-e key=value] [task_def] [command...]
 
 Flags:
   -h, --help    Print this help message
+  -l, --logs	Mount pry and irb local log volumes
   -e, --env     Set environments variable
   -p, --profile The AWS profile to use
   -r, --region  The AWS region the table is in
@@ -215,6 +217,23 @@ func main() {
 				"-e", fmt.Sprintf("AWS_SESSION_TOKEN=%s", *role.Credentials.SessionToken),
 			)
 		}
+	}
+	if *logFlag == true {
+		// get the current working dir
+		dir, err := os.Getwd()
+		if err != nil {
+			log.Fatal(err)
+		}
+		// touch the history files if they don't already exist in the current working dir
+		os.OpenFile(fmt.Sprintf("%s/.pry_history", dir), os.O_RDONLY|os.O_CREATE, 0666)
+		os.OpenFile(fmt.Sprintf("%s/.irb_history", dir), os.O_RDONLY|os.O_CREATE, 0666)
+		os.OpenFile(fmt.Sprintf("%s/.irb-history", dir), os.O_RDONLY|os.O_CREATE, 0666)
+		// append the file mounts to the docker command args
+		dockerArgs = append(dockerArgs,
+			"-v", fmt.Sprintf("%s/.pry_history:/srv/.pry_history", dir),
+			"-v", fmt.Sprintf("%s/.irb-history:/srv/.irb-history", dir),
+			"-v", fmt.Sprintf("%s/.irb_history:/srv/.irb_history", dir),
+		)
 	}
 
 	// parse environment flags

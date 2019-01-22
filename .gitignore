@@ -1,3 +1,5 @@
 .DS_Store
 ecs-local
+.irb*
+.pry_history
 dist/*
