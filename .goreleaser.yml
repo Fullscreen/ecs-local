@@ -40,7 +40,7 @@ brew:
   homepage: https://github.com/Fullscreen/ecs-local
   description: "Run ECS task definitions locally"
   install: |
-    bin.install ""ecs-local""
+    bin.install "ecs-local"
 changelog:
   sort: asc
   filters:
