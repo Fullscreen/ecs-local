@@ -1,4 +1,4 @@
-VERSION ?= $(shell cat VERSION)
+VERSION  := $(shell cat ./VERSION)
 GIT_HASH := $(shell git rev-parse HEAD)
 
 XC_OS ?= darwin linux
@@ -16,12 +16,9 @@ clean:
 build:
 	@gox -os="$(XC_OS)" -arch="$(XC_ARCH)" -ldflags "$(LDFLAGS)" -output "dist/{{.OS}}_{{.Arch}}/{{.Dir}}"
 
-release: build
-	@for platform in $$(find ./dist -mindepth 1 -maxdepth 1 -type d); do \
-		pushd $$platform >/dev/null; \
-		zip ../$$(basename $$platform).zip ./* >/dev/null; \
-		popd >/dev/null; \
-	done
-	@ghr -u fullscreen $(VERSION) dist/
+release:
+	git tag -a $(VERSION) -m "Release" || true
+	git push origin $(VERSION)
+	goreleaser --rm-dist
 
 .PHONY: clean release
