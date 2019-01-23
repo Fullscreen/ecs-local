@@ -38,7 +38,7 @@ brew:
     email: devops@fullscreen.com
   folder: Formula
   homepage: https://github.com/Fullscreen/ecs-local
-  skip_upload: true
+  description: "Run ECS task definitions locally"
   install: |
     bin.install ""ecs-local""
 changelog:
