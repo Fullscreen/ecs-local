@@ -29,7 +29,7 @@ const (
 )
 
 var (
-	Version = "0.1.6"
+	Version = "v0.1.7"
 )
 
 var (
