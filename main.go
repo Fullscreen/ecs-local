@@ -29,7 +29,7 @@ const (
 )
 
 var (
-	Version = "0.1.2"
+	Version = "0.1.3"
 )
 
 var (
@@ -38,6 +38,7 @@ var (
 	// options
 	helpFlag    = f.BoolP("help", "h", false, "help")
 	logFlag     = f.BoolP("logs", "l", false, "logs")
+	mountFlags  = f.StringSliceP("mount", "m", []string{}, "src:dest")
 	envFlags    = f.StringSliceP("env", "e", []string{}, "key=value")
 	profileFlag = f.StringP("profile", "p", "", "AWS profile")
 	regionFlag  = f.StringP("region", "r", "", "AWS region")
@@ -45,11 +46,12 @@ var (
 )
 
 const helpString = `Usage:
-  ecs-local [-hv] [-l] [--profile=aws_profile] [--region=aws_region] [-e key=value] [task_def] [command...]
+  ecs-local [-hv] [-l] [--profile=aws_profile] [--region=aws_region] [-e key=value] [-m src:dest] [task_def] [command...]
 
 Flags:
   -h, --help    Print this help message
   -l, --logs	Mount pry and irb local log volumes
+  -m, --mount   Mount src file or directory into container (-m $(pwd)/test:/srv/testtest)
   -e, --env     Set environments variable
   -p, --profile The AWS profile to use
   -r, --region  The AWS region the table is in
@@ -234,6 +236,15 @@ func main() {
 			"-v", fmt.Sprintf("%s/.irb-history:/srv/.irb-history", dir),
 			"-v", fmt.Sprintf("%s/.irb_history:/srv/.irb_history", dir),
 		)
+	}
+
+	// parse mount flags
+	if len(*mountFlags) > 0 {
+		for _, mount := range *mountFlags {
+			parts := strings.SplitN(mount, ":", 2)
+			dockerArgs = append(dockerArgs,
+				"-v", fmt.Sprintf("%s:%s", parts[0], parts[1]))
+		}
 	}
 
 	// parse environment flags
