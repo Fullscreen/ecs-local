@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -17,7 +18,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/sts"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/sirupsen/logrus"
-	flag "github.com/spf13/pflag"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -29,78 +31,121 @@ const (
 )
 
 var (
-	Version = "v0.1.7"
+	cfgFile string
+	profile string
+	region  string
+	taskdef string
+	action  string
 )
-
-var (
-	f = flag.NewFlagSet("flags", flag.ExitOnError)
-
-	// options
-	helpFlag    = f.BoolP("help", "h", false, "help")
-	logFlag     = f.BoolP("logs", "l", false, "logs")
-	mountFlags  = f.StringSliceP("mount", "m", []string{}, "src:dest")
-	envFlags    = f.StringSliceP("env", "e", []string{}, "key=value")
-	profileFlag = f.StringP("profile", "p", "", "AWS profile")
-	regionFlag  = f.StringP("region", "r", "", "AWS region")
-	verboseFlag = f.BoolP("verbose", "v", false, "verbose")
-)
-
-const helpString = `Usage:
-  ecs-local [-hv] [-l] [--profile=aws_profile] [--region=aws_region] [-e key=value] [-m src:dest] [task_def] [command...]
-
-Flags:
-  -h, --help    Print this help message
-  -l, --logs	Mount pry and irb local log volumes
-  -m, --mount   Mount src file or directory into container (-m $(pwd)/test:/srv/testtest)
-  -e, --env     Set environments variable
-  -p, --profile The AWS profile to use
-  -r, --region  The AWS region the table is in
-  -v, --verbose Verbose logging`
 
 var log = logrus.New()
 
-func help() {
-	fmt.Printf("ecs-local %s\n%s\n", Version, helpString)
-	os.Exit(exitCodeOk)
+func main() {
+	var rootCmd = &cobra.Command{
+		Use:     "ecs-local [flags] -t task_def [command...]",
+		Args:    cobra.ArbitraryArgs,
+		Version: "v0.2.0",
+		Run:     run,
+		Example: "ecs-local -t stage-accounts -m src:dest -c ecs-local-config.yaml -a 'bundle exec rails c'",
+	}
+	// define Cobra Persistent Flags
+	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "read from or write (-w) to config file (default is ecs-local-config.yaml)")
+	rootCmd.PersistentFlags().StringVarP(&profile, "profile", "p", "", "AWS profile")
+	rootCmd.PersistentFlags().StringVarP(&region, "region", "r", "", "AWS region")
+	rootCmd.PersistentFlags().StringVarP(&taskdef, "taskdef", "t", "", "task definition")
+	// rootCmd.MarkPersistentFlagRequired("taskdef")
+	rootCmd.PersistentFlags().StringVarP(&action, "action", "a", "", "commands/actions to be executed")
+	rootCmd.PersistentFlags().StringSliceP("mounts", "m", []string{}, "mounts src:dest")
+	rootCmd.PersistentFlags().StringSliceP("envs", "e", []string{}, "Env variables key=value")
+	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "verbose output")
+	rootCmd.PersistentFlags().BoolP("write", "w", false, "write to config file in -c and exit")
+
+	// Bind Persistent Flags to Viper config
+	viper.BindPFlags(rootCmd.PersistentFlags())
+
+	// Set reasonable defaults for Viper config
+	viper.SetDefault("config", "ecs-local-config.yaml")
+	viper.SetDefault("profile", "ecs")
+	viper.SetDefault("region", "us-east-1")
+	viper.SetDefault("action", "bundle exec rails c")
+
+	if err := rootCmd.Execute(); err != nil {
+		log.Debugf("\n%+v\n", err)
+		os.Exit(exitCodeError)
+	}
 }
 
-func main() {
-	f.Usage = help
-	f.Parse(os.Args[1:])
-	args := f.Args()
-
-	if *helpFlag == true {
-		help()
-	}
-
+func run(cmd *cobra.Command, args []string) {
+	// Setup Logging level
 	log.SetLevel(logrus.ErrorLevel)
-	if *verboseFlag == true {
+	if viper.GetBool("verbose") == true {
 		log.SetLevel(logrus.DebugLevel)
 	}
 
-	if len(args) < 1 {
-		help()
+	// Write flags to a config file
+	if viper.GetBool("write") == true {
+
+		// Write to the passed config file if passed otherwise write to the default
+		if cfgFile != "" {
+			viper.SetConfigFile(cfgFile)
+		} else {
+			viper.SetConfigName("ecs-local-config") // name of config file (without extension)
+		}
+		viper.SetConfigType("yaml")
+		viper.AddConfigPath(".")
+		viper.WriteConfig()
+		log.Println("Config saved")
+		os.Exit(exitCodeOk)
 	}
 
-	taskDefinitionName := args[0]
+	// Reading flags from a config file
+	if (viper.GetBool("write") == false) && (cfgFile != "") {
+
+		// get the filepath
+		abs, err := filepath.Abs(cfgFile)
+		if err != nil {
+			log.Debugf("Error reading filepath: %s", err.Error())
+		}
+
+		// get the config name
+		base := filepath.Base(abs)
+
+		// get the paths
+		path := filepath.Dir(abs)
+
+		//
+		viper.SetConfigName(strings.Split(base, ".")[0])
+		viper.AddConfigPath(path)
+
+		// Find and read the config file; Handle errors reading the config file
+		if err := viper.ReadInConfig(); err != nil {
+			log.Debugf("Failed to read config file: %s", err.Error())
+			os.Exit(exitCodeError)
+		}
+	}
+
+	if viper.GetString("taskdef") == "" {
+		fmt.Println("no taskdef defined")
+		cmd.Help()
+		os.Exit(exitCodeOk)
+	}
+
+	taskDefinitionName := viper.GetString("taskdef")
 
 	// set desired AWS region
-	awsRegion := "us-east-1"
+	awsRegion := viper.GetString("region")
 	if envRegion, present := os.LookupEnv("AWS_REGION"); present {
 		awsRegion = envRegion
-	}
-	if *regionFlag != "" {
-		awsRegion = *regionFlag
+		log.Debugf("Using AWS_REGION from ENV")
 	}
 
 	// set desired AWS profile
-	awsProfile := "default"
+	awsProfile := viper.GetString("profile")
 	if envProfile, present := os.LookupEnv("AWS_PROFILE"); present {
 		awsProfile = envProfile
+		log.Debugf("Using AWS_PROFILE from ENV")
 	}
-	if *profileFlag != "" {
-		awsProfile = *profileFlag
-	}
+
 	log.Debugf("Using AWS region \"%s\" ", awsRegion)
 	log.Debugf("Using AWS profile \"%s\" ", awsProfile)
 
@@ -187,7 +232,7 @@ func main() {
 	dockerArgs := []string{"run", "-it", "--rm"}
 
 	// set docker command
-	command := args[1:]
+	command := strings.Split(viper.GetString("action"), " ")
 	if len(command) == 0 {
 		for _, v := range task.ContainerDefinitions[0].Command {
 			command = append(command, *v)
@@ -220,27 +265,11 @@ func main() {
 			)
 		}
 	}
-	if *logFlag == true {
-		// get the current working dir
-		dir, err := os.Getwd()
-		if err != nil {
-			log.Fatal(err)
-		}
-		// touch the history files if they don't already exist in the current working dir
-		os.OpenFile(fmt.Sprintf("%s/.pry_history", dir), os.O_RDONLY|os.O_CREATE, 0666)
-		os.OpenFile(fmt.Sprintf("%s/.irb_history", dir), os.O_RDONLY|os.O_CREATE, 0666)
-		os.OpenFile(fmt.Sprintf("%s/.irb-history", dir), os.O_RDONLY|os.O_CREATE, 0666)
-		// append the file mounts to the docker command args
-		dockerArgs = append(dockerArgs,
-			"-v", fmt.Sprintf("%s/.pry_history:/srv/.pry_history", dir),
-			"-v", fmt.Sprintf("%s/.irb-history:/srv/.irb-history", dir),
-			"-v", fmt.Sprintf("%s/.irb_history:/srv/.irb_history", dir),
-		)
-	}
 
-	// parse mount flags
-	if len(*mountFlags) > 0 {
-		for _, mount := range *mountFlags {
+	// parse mounts flags
+	mounts := viper.GetStringSlice("mounts")
+	if len(mounts) > 0 {
+		for _, mount := range mounts {
 			parts := strings.SplitN(mount, ":", 2)
 			dockerArgs = append(dockerArgs,
 				"-v", fmt.Sprintf("%s:%s", parts[0], parts[1]))
@@ -248,8 +277,9 @@ func main() {
 	}
 
 	// parse environment flags
-	if len(*envFlags) > 0 {
-		for _, env := range *envFlags {
+	envs := viper.GetStringSlice("envs")
+	if len(envs) > 0 {
+		for _, env := range envs {
 			parts := strings.SplitN(env, "=", 2)
 			dockerArgs = append(dockerArgs,
 				"-e", fmt.Sprintf("%s=%s", parts[0], parts[1]))
@@ -259,11 +289,11 @@ func main() {
 	dockerArgs = append(dockerArgs, *image)
 
 	// start the container
-	cmd := exec.Command("docker", append(dockerArgs, command...)...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	dockerCmd := exec.Command("docker", append(dockerArgs, command...)...)
+	dockerCmd.Stdin = os.Stdin
+	dockerCmd.Stdout = os.Stdout
+	dockerCmd.Stderr = os.Stderr
 
-	cmd.Start()
-	cmd.Wait()
+	dockerCmd.Start()
+	dockerCmd.Wait()
 }
