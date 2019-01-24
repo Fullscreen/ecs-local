@@ -2,4 +2,6 @@
 ecs-local
 .irb*
 .pry_history
+ecs-local-config.yaml
+*.yaml
 dist/*
