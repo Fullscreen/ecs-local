@@ -42,9 +42,9 @@ var log = logrus.New()
 
 func main() {
 	var rootCmd = &cobra.Command{
-		Use:     "ecs-local [flags] -t task_def [command...]",
+		Use:     "ecs-local [flags] -t task_def -a 'command...'",
 		Args:    cobra.ArbitraryArgs,
-		Version: "v0.2.0",
+		Version: "v0.2.1",
 		Run:     run,
 		Example: "ecs-local -t stage-accounts -m src:dest -c ecs-local-config.yaml -a 'bundle exec rails c'",
 	}
@@ -85,10 +85,21 @@ func run(cmd *cobra.Command, args []string) {
 	// Write flags to a config file
 	if viper.GetBool("write") == true {
 
+		// Get the current working dir
+		dir, err := os.Getwd()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// overwrite the "write" bool when saving the config
+		viper.Set("write", false)
+
 		// Write to the passed config file if passed otherwise write to the default
 		if cfgFile != "" {
+			os.OpenFile(fmt.Sprintf("%s/%s", dir, cfgFile), os.O_RDONLY|os.O_CREATE, 0666)
 			viper.SetConfigFile(cfgFile)
 		} else {
+			os.OpenFile(fmt.Sprintf("%s/ecs-local-config.yaml", dir), os.O_RDONLY|os.O_CREATE, 0666)
 			viper.SetConfigName("ecs-local-config") // name of config file (without extension)
 		}
 		viper.SetConfigType("yaml")
@@ -122,6 +133,41 @@ func run(cmd *cobra.Command, args []string) {
 			log.Debugf("Failed to read config file: %s", err.Error())
 			os.Exit(exitCodeError)
 		}
+	}
+
+	// TODO need to build a function for the reading in of configs sometime.
+	// Reading flags from default file if it exists
+	if (viper.GetBool("write") == false) && (cfgFile == "") {
+		defaultConfigFile := "ecs-local-config.yaml"
+
+		if _, err := os.Stat(defaultConfigFile); os.IsNotExist(err) {
+			log.Debugf("No default config found: %s", err.Error())
+		} else {
+			log.Debugf("default config found parsing for flags")
+
+			// get the filepath
+			abs, err := filepath.Abs(defaultConfigFile)
+			if err != nil {
+				log.Debugf("Error reading filepath: %s", err.Error())
+			}
+
+			// get the config name
+			base := filepath.Base(abs)
+
+			// get the paths
+			path := filepath.Dir(abs)
+
+			//
+			viper.SetConfigName(strings.Split(base, ".")[0])
+			viper.AddConfigPath(path)
+
+			// Find and read the config file; Handle errors reading the config file
+			if err := viper.ReadInConfig(); err != nil {
+				log.Debugf("Failed to read config file: %s", err.Error())
+				os.Exit(exitCodeError)
+			}
+		}
+
 	}
 
 	if viper.GetString("taskdef") == "" {
