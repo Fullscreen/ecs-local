@@ -5,7 +5,7 @@ Run ECS task definitions locally.
 ## Usage
 
 ```shell
-ecs-local [-hv] [--profile=aws_profile] [--region=aws_region] [-e key=value] [task_def] [command...]
+ecs-local -e SOME_VAR=FOO-t stage-accounts -m src:dest -c ecs-local-config.yaml -a '/bin/bash'
 ```
 
 ## Install
