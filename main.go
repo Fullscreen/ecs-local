@@ -44,7 +44,7 @@ func main() {
 	var rootCmd = &cobra.Command{
 		Use:     "ecs-local [flags] -t task_def -a 'command...'",
 		Args:    cobra.ArbitraryArgs,
-		Version: "v0.2.1",
+		Version: "v0.2.2",
 		Run:     run,
 		Example: "ecs-local -t stage-accounts -m src:dest -c ecs-local-config.yaml -a 'bundle exec rails c'",
 	}
@@ -65,7 +65,7 @@ func main() {
 
 	// Set reasonable defaults for Viper config
 	viper.SetDefault("config", "ecs-local-config.yaml")
-	viper.SetDefault("profile", "ecs")
+	viper.SetDefault("profile", "default")
 	viper.SetDefault("region", "us-east-1")
 	viper.SetDefault("action", "bundle exec rails c")
 
