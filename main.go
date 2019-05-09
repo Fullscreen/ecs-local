@@ -36,6 +36,7 @@ var (
 	region  string
 	taskdef string
 	action  string
+	port    string
 )
 
 var log = logrus.New()
@@ -55,6 +56,7 @@ func main() {
 	rootCmd.PersistentFlags().StringVarP(&taskdef, "taskdef", "t", "", "task definition")
 	// rootCmd.MarkPersistentFlagRequired("taskdef")
 	rootCmd.PersistentFlags().StringVarP(&action, "action", "a", "", "commands/actions to be executed")
+	rootCmd.PersistentFlags().StringVarP(&port, "port", "", "", "service port")
 	rootCmd.PersistentFlags().StringSliceP("mounts", "m", []string{}, "mounts src:dest")
 	rootCmd.PersistentFlags().StringSliceP("envs", "e", []string{}, "Env variables key=value")
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "verbose output")
@@ -227,6 +229,7 @@ func run(cmd *cobra.Command, args []string) {
 
 	task := resp.TaskDefinition
 	image := task.ContainerDefinitions[0].Image
+	portMap := task.ContainerDefinitions[0].PortMappings
 
 	log.Debugf("Found task %s", *task.TaskDefinitionArn)
 
@@ -329,6 +332,18 @@ func run(cmd *cobra.Command, args []string) {
 			parts := strings.SplitN(env, "=", 2)
 			dockerArgs = append(dockerArgs,
 				"-e", fmt.Sprintf("%s=%s", parts[0], parts[1]))
+		}
+	}
+
+	// parse port flag
+	port := viper.GetString("port")
+	if port != "" {
+		dockerArgs = append(dockerArgs,
+			"-p", fmt.Sprintf("%v:%[1]v", port))
+	} else {
+		for _, p := range portMap {
+			dockerArgs = append(dockerArgs,
+				"-p", fmt.Sprintf("%v:%v", *p.HostPort, *p.ContainerPort))
 		}
 	}
 
