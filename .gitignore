@@ -5,3 +5,4 @@ ecs-local
 ecs-local-config.yaml
 *.yaml
 dist/*
+.vscode
