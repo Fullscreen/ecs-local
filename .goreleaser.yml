@@ -13,34 +13,36 @@ builds:
     - amd64
     - arm
     - arm64
-archive:
-  name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
-  replacements:
-    darwin: Darwin
-    linux: Linux
-    windows: Windows
-    386: i386
-    amd64: x86_64
-  format_overrides:
-  - goos: windows
-    format: zip
+archives:
+  - id: Github Archives
+    name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+    replacements:
+      darwin: Darwin
+      linux: Linux
+      windows: Windows
+      386: i386
+      amd64: x86_64
+    format_overrides:
+      - goos: windows
+        format: zip
 checksum:
   name_template: 'checksums.txt'
 snapshot:
   name_template: "{{ .Tag }}-next"
-brew:
-  name: ecs-local
-  github:
-    owner: Fullscreen
-    name: homebrew-tap
-  commit_author:
-    name: devops
-    email: devops@fullscreen.com
-  folder: Formula
-  homepage: https://github.com/Fullscreen/ecs-local
-  description: "Run ECS task definitions locally"
-  install: |
-    bin.install "ecs-local"
+brews:
+  -
+    name: ecs-local
+    github:
+      owner: Fullscreen
+      name: homebrew-tap
+    commit_author:
+      name: devops
+      email: devops@fullscreen.com
+    folder: Formula
+    homepage: https://github.com/Fullscreen/ecs-local
+    description: "Run ECS task definitions locally"
+    install: |
+      bin.install "ecs-local"
 changelog:
   sort: asc
   filters:
