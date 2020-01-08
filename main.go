@@ -31,12 +31,12 @@ const (
 )
 
 var (
-	cfgFile string
-	profile string
-	region  string
-	taskdef string
-	action  string
-	port    string
+	cfgFile    string
+	profile    string
+	region     string
+	taskdef    string
+	action     string
+	port       string
 	entrypoint string
 )
 
@@ -46,7 +46,7 @@ func main() {
 	var rootCmd = &cobra.Command{
 		Use:     "ecs-local [flags] -t task_def -a 'command...'",
 		Args:    cobra.ArbitraryArgs,
-		Version: "v0.2.4",
+		Version: "v0.2.7",
 		Run:     run,
 		Example: "ecs-local -t stage-accounts -m src:dest -c ecs-local-config.yaml -a 'bundle exec rails c'",
 	}
