@@ -46,7 +46,7 @@ func main() {
 	var rootCmd = &cobra.Command{
 		Use:     "ecs-local [flags] -t task_def -a 'command...'",
 		Args:    cobra.ArbitraryArgs,
-		Version: "v0.2.7",
+		Version: "v0.2.8",
 		Run:     run,
 		Example: "ecs-local -t stage-accounts -m src:dest -c ecs-local-config.yaml -a 'bundle exec rails c'",
 	}
