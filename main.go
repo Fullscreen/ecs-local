@@ -37,6 +37,7 @@ var (
 	taskdef string
 	action  string
 	port    string
+	entrypoint string
 )
 
 var log = logrus.New()
@@ -55,6 +56,7 @@ func main() {
 	rootCmd.PersistentFlags().StringVarP(&region, "region", "r", "", "AWS region")
 	rootCmd.PersistentFlags().StringVarP(&taskdef, "taskdef", "t", "", "task definition")
 	// rootCmd.MarkPersistentFlagRequired("taskdef")
+	rootCmd.PersistentFlags().StringVarP(&entrypoint, "entrypoint", "", "", "docker entrypoint override")
 	rootCmd.PersistentFlags().StringVarP(&action, "action", "a", "", "commands/actions to be executed")
 	rootCmd.PersistentFlags().StringVarP(&port, "port", "", "", "service port")
 	rootCmd.PersistentFlags().StringSliceP("mounts", "m", []string{}, "mounts src:dest")
@@ -280,12 +282,27 @@ func run(cmd *cobra.Command, args []string) {
 
 	dockerArgs := []string{"run", "-it", "--rm"}
 
+	// set docker entrypoint
+	entrypoint := strings.Split(viper.GetString("entrypoint"), " ")
+	if len(entrypoint) == 0 {
+		for _, v := range task.ContainerDefinitions[0].EntryPoint {
+			dockerArgs = append(dockerArgs,
+				"--entrypoint", fmt.Sprintf("%s", &v))
+		}
+	} else {
+		dockerArgs = append(dockerArgs, "--entrypoint", fmt.Sprintf("%s", entrypoint[0]))
+	}
+
+	log.Debugf("Running with entrypoint \"%s\"", strings.Join(entrypoint, " "))
+
 	// set docker command
 	command := strings.Split(viper.GetString("action"), " ")
-	if len(command) == 0 {
+	if len(command) == 0 && len(entrypoint[0]) == 0 {
 		for _, v := range task.ContainerDefinitions[0].Command {
 			command = append(command, *v)
 		}
+	} else if len(entrypoint[0]) > 1 {
+		command = []string{}
 	}
 	log.Debugf("Running command \"%s\"", strings.Join(command, " "))
 
