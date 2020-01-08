@@ -30,18 +30,19 @@ checksum:
 snapshot:
   name_template: "{{ .Tag }}-next"
 brews:
-  name: ecs-local
-  github:
-    owner: Fullscreen
-    name: homebrew-tap
-  commit_author:
-    name: devops
-    email: devops@fullscreen.com
-  folder: Formula
-  homepage: https://github.com/Fullscreen/ecs-local
-  description: "Run ECS task definitions locally"
-  install: |
-    bin.install "ecs-local"
+  -
+    name: ecs-local
+    github:
+      owner: Fullscreen
+      name: homebrew-tap
+    commit_author:
+      name: devops
+      email: devops@fullscreen.com
+    folder: Formula
+    homepage: https://github.com/Fullscreen/ecs-local
+    description: "Run ECS task definitions locally"
+   install: |
+      bin.install "ecs-local"
 changelog:
   sort: asc
   filters:
